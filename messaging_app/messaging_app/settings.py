@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     
     'rest_framework',  # Django REST Framework for API support
     'rest_framework_simplejwt',
+    'drf_spectacular',  # For OpenAPI schema generation
     'app_users',  # Custom app for user management
     'app_messages',  # Custom app for messaging functionality
     
@@ -83,7 +84,8 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
-    ]
+    ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 
