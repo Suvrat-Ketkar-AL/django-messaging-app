@@ -66,8 +66,8 @@ class MessageViewSet(viewsets.ModelViewSet):
         - If the sender is not the authenticated user, it raises a PermissionDenied exception.
         """
         # If the instance is not the logged-in user's message, deny the delete request
-        if instance.sender != self.request.user:
-            raise PermissionDenied("You can only delete your own messages.")
+        if instance.sender != self.request.user and not self.request.user.is_staff:
+            raise PermissionDenied("You can only delete your own messages unless you are an admin.")
         
         # Proceed to delete the message instance from the database
         instance.delete()
