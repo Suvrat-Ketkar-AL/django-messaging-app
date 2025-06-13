@@ -1,80 +1,41 @@
 from .models import Message_Model
 from .serializers import MessageSerializer
 from rest_framework import viewsets, permissions
+from rest_framework.decorators import action
+from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
 from rest_framework.exceptions import PermissionDenied
 from django.utils import timezone
 from datetime import timedelta
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework import status
+from django.contrib.auth.models import User
+from django.shortcuts import get_object_or_404
 
+
+# 🟢 Regular user ViewSet
 class MessageViewSet(viewsets.ModelViewSet):
-    # Specify the serializer class that will be used for validation and serialization
-    
     queryset = Message_Model.objects.all().order_by('-timestamp')
-
     serializer_class = MessageSerializer
-
     permission_classes = [permissions.IsAuthenticated]
-    
     filter_backends = [filters.SearchFilter, DjangoFilterBackend]
-    search_fields = ['content']  # Searchable fields
+    search_fields = ['content']
 
     def perform_create(self, serializer):
-        """
-        When a new message is being created, this method is called to set the
-        'sender' field to the currently authenticated user.
-        
-        DRF automatically provides the logged-in user in the request object,
-        which is accessible via `self.request.user`.
-        """
-        # Save the message with the currently authenticated user as the sender
         serializer.save(sender=self.request.user)
-    
-    def perform_update(self, serializer):
-        """
-        This method is invoked when a PUT or PATCH request is made to update
-        an existing message. 
-        
-        - First, it retrieves the message that is being updated using `self.get_object()`.
-        - Then, it checks if the sender of the message matches the current authenticated user.
-        - If the message was created more than 5 minutes ago, it denies the update request.
-        """
-        # Retrieve the specific message object being updated from the database
-        # `self.get_object()` will fetch the message based on the `pk` (primary key) in the URL
-        message = self.get_object()
 
-        # Check if the current user is the sender of the message
-        # If not, raise a PermissionDenied exception
+    def perform_update(self, serializer):
+        message = self.get_object()
         if message.sender != self.request.user:
             raise PermissionDenied("You can only edit your own messages.")
-        
-                # Check if the message was created within the last 5 minutes
-        # If it's older, deny the update request
         if timezone.now() - message.timestamp > timedelta(minutes=5):
             raise PermissionDenied("You can only edit messages within 5 minutes of posting.")
-        
-        # Save the updated message (after any validation done in the serializer)
         serializer.save()
-        
 
-    
     def perform_destroy(self, instance):
-        """
-        This method is used when a DELETE request is made to delete a message.
-        
-        - First, it checks if the user requesting the delete is the sender of the message.
-        - If the sender is not the authenticated user, it raises a PermissionDenied exception.
-        """
-        # If the instance is not the logged-in user's message, deny the delete request
         if instance.sender != self.request.user and not self.request.user.is_staff:
             raise PermissionDenied("You can only delete your own messages unless you are an admin.")
-        
-        # Proceed to delete the message instance from the database
         instance.delete()
-
+    
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def report(self, request, pk=None):
         """
@@ -92,32 +53,38 @@ class MessageViewSet(viewsets.ModelViewSet):
 
         return Response({"detail": "Message reported successfully."}, status=200)
 
-    
-    @action(detail=False, methods=['get'], permission_classes=[permissions.IsAdminUser])
-    def reported(self, request):
-        """
-        Allows admin users to view all reported messages.
-        """
-        reported_messages = Message_Model.objects.filter(is_reported=True).order_by('-timestamp')
-        serializer = self.get_serializer(reported_messages, many=True)
+
+# 🔴 Admin-only ViewSet
+class AdminMessageViewSet(viewsets.ModelViewSet):
+    queryset = Message_Model.objects.all().order_by('-timestamp')
+    serializer_class = MessageSerializer
+    permission_classes = [permissions.IsAdminUser]
+    filter_backends = [filters.SearchFilter, DjangoFilterBackend]
+    search_fields = ['content']
+
+    # Admin can delete any message
+    def perform_destroy(self, instance):
+        instance.delete()
+
+    # Admin can view reported messages
+    @action(detail=False, methods=['get'], url_path='reported')
+    def reported_messages(self, request):
+        reported_msgs = Message_Model.objects.filter(is_reported=True)
+        serializer = self.get_serializer(reported_msgs, many=True)
         return Response(serializer.data)
 
+    # Admin can redact a message
+    @action(detail=True, methods=['post'], url_path='redact')
+    def redact_message(self, request, pk=None):
+        message = self.get_object()
+        message.content = "[Message redacted by admin]"
+        message.save()
+        return Response({'status': 'message redacted'})
 
-
-
-
-
-
-
-
-    
-    
-    # def get_queryset(self):
-    #     """
-    #     Returns a queryset of all messages, ordered in reverse chronological order
-    #     by the 'timestamp' field. This is used for actions like GET requests to
-    #     list messages.
-    #     """
-    #     # The query returns all messages, ordered by the most recent first.
-    #     return Message_Model.objects.all().order_by('-timestamp')
-    
+    # Admin can suspend a user
+    @action(detail=True, methods=['post'], url_path='suspend-user')
+    def suspend_user(self, request, pk=None):
+        user = get_object_or_404(User, pk=pk)
+        user.is_active = False
+        user.save()
+        return Response({'status': f'User {user.username} has been suspended'})
