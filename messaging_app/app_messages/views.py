@@ -1,25 +1,34 @@
-from rest_framework import viewsets, permissions
 from .models import Message_Model
 from .serializers import MessageSerializer
+from rest_framework import viewsets, permissions
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import filters
 from rest_framework.exceptions import PermissionDenied
 from django.utils import timezone
 from datetime import timedelta
 
 class MessageViewSet(viewsets.ModelViewSet):
     # Specify the serializer class that will be used for validation and serialization
-    serializer_class = MessageSerializer
     
-    # Define the permission classes to enforce authentication
+    queryset = Message_Model.objects.all().order_by('-timestamp')
+
+    serializer_class = MessageSerializer
+
     permission_classes = [permissions.IsAuthenticated]
     
-    def get_queryset(self):
-        """
-        Returns a queryset of all messages, ordered in reverse chronological order
-        by the 'timestamp' field. This is used for actions like GET requests to
-        list messages.
-        """
-        # The query returns all messages, ordered by the most recent first.
-        return Message_Model.objects.all().order_by('-timestamp')
+    filter_backends = [filters.SearchFilter, DjangoFilterBackend]
+    search_fields = ['content']  # Searchable fields
+
+    
+    
+    # def get_queryset(self):
+    #     """
+    #     Returns a queryset of all messages, ordered in reverse chronological order
+    #     by the 'timestamp' field. This is used for actions like GET requests to
+    #     list messages.
+    #     """
+    #     # The query returns all messages, ordered by the most recent first.
+    #     return Message_Model.objects.all().order_by('-timestamp')
     
     def perform_create(self, serializer):
         """
