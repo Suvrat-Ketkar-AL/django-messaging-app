@@ -6,6 +6,9 @@ from rest_framework import filters
 from rest_framework.exceptions import PermissionDenied
 from django.utils import timezone
 from datetime import timedelta
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework import status
 
 class MessageViewSet(viewsets.ModelViewSet):
     # Specify the serializer class that will be used for validation and serialization
@@ -19,17 +22,6 @@ class MessageViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter, DjangoFilterBackend]
     search_fields = ['content']  # Searchable fields
 
-    
-    
-    # def get_queryset(self):
-    #     """
-    #     Returns a queryset of all messages, ordered in reverse chronological order
-    #     by the 'timestamp' field. This is used for actions like GET requests to
-    #     list messages.
-    #     """
-    #     # The query returns all messages, ordered by the most recent first.
-    #     return Message_Model.objects.all().order_by('-timestamp')
-    
     def perform_create(self, serializer):
         """
         When a new message is being created, this method is called to set the
@@ -59,13 +51,15 @@ class MessageViewSet(viewsets.ModelViewSet):
         if message.sender != self.request.user:
             raise PermissionDenied("You can only edit your own messages.")
         
-        # Save the updated message (after any validation done in the serializer)
-        serializer.save()
-        
-        # Check if the message was created within the last 5 minutes
+                # Check if the message was created within the last 5 minutes
         # If it's older, deny the update request
         if timezone.now() - message.timestamp > timedelta(minutes=5):
             raise PermissionDenied("You can only edit messages within 5 minutes of posting.")
+        
+        # Save the updated message (after any validation done in the serializer)
+        serializer.save()
+        
+
     
     def perform_destroy(self, instance):
         """
@@ -80,3 +74,50 @@ class MessageViewSet(viewsets.ModelViewSet):
         
         # Proceed to delete the message instance from the database
         instance.delete()
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def report(self, request, pk=None):
+        """
+        Allows a user to report a message. A user can report a message only once.
+        """
+        message = self.get_object()
+        user = request.user
+
+        if user in message.reported_by.all():
+            return Response({"detail": "You have already reported this message."}, status=400)
+
+        message.reported_by.add(user)
+        message.is_reported = True
+        message.save()
+
+        return Response({"detail": "Message reported successfully."}, status=200)
+
+    
+    @action(detail=False, methods=['get'], permission_classes=[permissions.IsAdminUser])
+    def reported(self, request):
+        """
+        Allows admin users to view all reported messages.
+        """
+        reported_messages = Message_Model.objects.filter(is_reported=True).order_by('-timestamp')
+        serializer = self.get_serializer(reported_messages, many=True)
+        return Response(serializer.data)
+
+
+
+
+
+
+
+
+
+    
+    
+    # def get_queryset(self):
+    #     """
+    #     Returns a queryset of all messages, ordered in reverse chronological order
+    #     by the 'timestamp' field. This is used for actions like GET requests to
+    #     list messages.
+    #     """
+    #     # The query returns all messages, ordered by the most recent first.
+    #     return Message_Model.objects.all().order_by('-timestamp')
+    
