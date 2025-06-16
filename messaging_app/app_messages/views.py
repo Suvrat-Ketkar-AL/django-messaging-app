@@ -53,6 +53,26 @@ class MessageViewSet(viewsets.ModelViewSet):
 
         return Response({"detail": "Message reported successfully."}, status=200)
 
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated], url_path='bookmark')
+    def add_bookmark(self, request, pk=None):
+        user = request.user
+        message = self.get_object()
+        if user in message.bookmarked_by.all():
+            return Response({"detail": "You have already bookmarked this message."}, status=400)
+        message.bookmarked_by.add(user)
+        return Response({"detail": "Message bookmarked successfully."}, status=200)
+    
+    @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated], url_path='view-bookmarks')
+    def view_bookmarks(self, request, pk=None):
+        """
+        Allows a user to view their bookmarked messages.
+        """
+        user = request.user
+        bookmarked_messages = Message_Model.objects.filter(bookmarked_by=user)
+        serializer = self.get_serializer(bookmarked_messages, many=True)
+        return Response(serializer.data)
+
+
 
 # 🔴 Admin-only ViewSet
 class AdminMessageViewSet(viewsets.ModelViewSet):

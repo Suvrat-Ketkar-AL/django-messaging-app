@@ -7,6 +7,6 @@ class Message_Model(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True)
     is_reported = models.BooleanField(default=False)
     reported_by = models.ManyToManyField(User, related_name='reported_messages', blank=True)
-
+    bookmarked_by = models.ManyToManyField(User, related_name='bookmarked_messages', blank=True)
     def __str__(self):
         return f"Message from {self.sender.username} at {self.timestamp}"
