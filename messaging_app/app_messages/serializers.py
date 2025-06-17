@@ -13,7 +13,7 @@ class BaseMessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Message_Model
         fields = ['id', 'sender_username', 'content', 'timestamp', 'is_mod_message']
-        read_only_fields = ['id', 'sender_username', 'timestamp']
+        read_only_fields = ['id', 'sender_username', 'timestamp', 'is_mod_message']
 
 class UserMessageSerializer(BaseMessageSerializer):
     class Meta(BaseMessageSerializer.Meta):
@@ -26,3 +26,4 @@ class AdminMessageSerializer(BaseMessageSerializer):
 
     class Meta(BaseMessageSerializer.Meta):
         fields = BaseMessageSerializer.Meta.fields + ['is_reported', 'reported_by']
+        

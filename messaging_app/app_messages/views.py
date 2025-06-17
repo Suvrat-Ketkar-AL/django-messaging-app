@@ -77,11 +77,10 @@ class UserMessageViewSet(BaseMessageViewSet):
 
 
 # Admin-only ViewSet
-class AdminMessageViewSet(BaseMessageViewSet):
+class AdminMessageViewSet(UserMessageViewSet):
     
     serializer_class = AdminMessageSerializer
     permission_classes = [permissions.IsAdminUser]
-
 
     # Admin can delete any message
     def perform_destroy(self, instance):
