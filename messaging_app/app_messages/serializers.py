@@ -4,7 +4,7 @@ from drf_spectacular.utils import extend_schema_field
 
 # fields common to both
 class UserMessageSerializer(serializers.ModelSerializer):
-    sender_username = serializers.CharField(source='sender.username')
+    sender_username = serializers.CharField(source='sender.username',read_only=True)
     is_mod_message = serializers.SerializerMethodField()
 
     @extend_schema_field(bool)
@@ -27,9 +27,9 @@ class AdminMessageSerializer(UserMessageSerializer):
 
 
 class ReportedMessageSerializer(serializers.ModelSerializer):
-    reporter = serializers.CharField(source='reporter.username')
-    message_id = serializers.IntegerField(source='message.id')
-    message_content = serializers.CharField(source='message.content')
+    reporter = serializers.CharField(source='reporter.username',read_only=True)
+    message_id = serializers.IntegerField(source='message.id',read_only=True)
+    message_content = serializers.CharField(source='message.content',read_only=True)
 
     class Meta:
         model = Reported_Message_Model
