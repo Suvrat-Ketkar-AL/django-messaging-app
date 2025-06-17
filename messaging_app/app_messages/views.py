@@ -50,10 +50,10 @@ class UserMessageViewSet(BaseMessageViewSet):
         if not reason:
             return Response({"detail": "Reason for reporting is required."}, status=400)
 
-        if Reported_Message_Model.objects.filter(message_id=message, reporter=user).exists():
+        if Reported_Message_Model.objects.filter(message=message, reporter=user).exists():
             return Response({"detail": "You have already reported this message."}, status=400)
 
-        Reported_Message_Model.objects.create(message_id=message, reporter=user, reason=reason)
+        Reported_Message_Model.objects.create(message=message, reporter=user, reason=reason)
         message.is_reported = True
         message.save()
 
