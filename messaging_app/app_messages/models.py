@@ -29,4 +29,4 @@ class Reported_Message_Model(models.Model):
         unique_together = ('message', 'reporter')  # Prevent duplicate reports
 
     def __str__(self):
-        return f"Report by {self.reported.username} for message {self.message.id} at {self.timestamp}"
+        return f"Report by {self.reporter.username} for message {self.message.id} at {self.reported_at}"
