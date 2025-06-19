@@ -1,6 +1,6 @@
-from .models import Message_Model
+from .models import Message_Model, Reported_Message_Model
 from django.contrib.auth.models import User
-from .serializers import UserMessageSerializer, AdminMessageSerializer
+from .serializers import UserMessageSerializer, AdminMessageSerializer, ReportedMessageSerializer
 from rest_framework import viewsets, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -46,13 +46,17 @@ class UserMessageViewSet(BaseMessageViewSet):
         """
         message = self.get_object()
         user = request.user
+        reason = request.data.get('reason')
+        if not reason:
+            return Response({"detail": "Reason for reporting is required."}, status=400)
 
-        if user in message.reported_by.all():
+        if Reported_Message_Model.objects.filter(message=message, reporter=user).exists():
             return Response({"detail": "You have already reported this message."}, status=400)
 
-        message.reported_by.add(user)
+        Reported_Message_Model.objects.create(message=message, reporter=user, reason=reason)
         message.is_reported = True
         message.save()
+
 
         return Response({"detail": "Message reported successfully."}, status=200)
 
@@ -89,8 +93,8 @@ class AdminMessageViewSet(UserMessageViewSet):
     # Admin can view reported messages
     @action(detail=False, methods=['get'], url_path='reported-messages')
     def reported_messages(self, request):
-        reported_msgs = Message_Model.objects.filter(is_reported=True)
-        serializer = self.get_serializer(reported_msgs, many=True)
+        reported_msgs = Reported_Message_Model.objects.all().order_by('-reported_at')
+        serializer = ReportedMessageSerializer(reported_msgs, many=True)
         return Response(serializer.data)
 
     # Admin can redact a message
