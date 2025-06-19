@@ -1,5 +1,6 @@
 from .models import Message_Model
-from .serializers import MessageSerializer
+from django.contrib.auth.models import User
+from .serializers import UserMessageSerializer, AdminMessageSerializer
 from rest_framework import viewsets, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -8,17 +9,19 @@ from rest_framework import filters
 from rest_framework.exceptions import PermissionDenied
 from django.utils import timezone
 from datetime import timedelta
-from django.contrib.auth.models import User
+
 from django.shortcuts import get_object_or_404
 
-
-# 🟢 Regular user ViewSet
-class MessageViewSet(viewsets.ModelViewSet):
+class BaseMessageViewSet(viewsets.ModelViewSet):
     queryset = Message_Model.objects.all().order_by('-timestamp')
-    serializer_class = MessageSerializer
-    permission_classes = [permissions.IsAuthenticated]
     filter_backends = [filters.SearchFilter, DjangoFilterBackend]
     search_fields = ['content']
+    permission_classes = [permissions.IsAuthenticated]
+
+# Regular user ViewSet
+class UserMessageViewSet(BaseMessageViewSet):
+    
+    serializer_class = UserMessageSerializer
 
     def perform_create(self, serializer):
         serializer.save(sender=self.request.user)
@@ -36,7 +39,7 @@ class MessageViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("You can only delete your own messages unless you are an admin.")
         instance.delete()
     
-    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    @action(detail=True, methods=['post'],url_path='report-message')
     def report(self, request, pk=None):
         """
         Allows a user to report a message. A user can report a message only once.
@@ -53,7 +56,7 @@ class MessageViewSet(viewsets.ModelViewSet):
 
         return Response({"detail": "Message reported successfully."}, status=200)
 
-    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated], url_path='bookmark')
+    @action(detail=True, methods=['post'], url_path='bookmark')
     def add_bookmark(self, request, pk=None):
         user = request.user
         message = self.get_object()
@@ -62,8 +65,8 @@ class MessageViewSet(viewsets.ModelViewSet):
         message.bookmarked_by.add(user)
         return Response({"detail": "Message bookmarked successfully."}, status=200)
     
-    @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated], url_path='view-bookmarks')
-    def view_bookmarks(self, request, pk=None):
+    @action(detail=False, methods=['get'], url_path='view-bookmarks')
+    def view_bookmarks(self, request):
         """
         Allows a user to view their bookmarked messages.
         """
@@ -73,21 +76,18 @@ class MessageViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
-
-# 🔴 Admin-only ViewSet
-class AdminMessageViewSet(viewsets.ModelViewSet):
-    queryset = Message_Model.objects.all().order_by('-timestamp')
-    serializer_class = MessageSerializer
+# Admin-only ViewSet
+class AdminMessageViewSet(UserMessageViewSet):
+    
+    serializer_class = AdminMessageSerializer
     permission_classes = [permissions.IsAdminUser]
-    filter_backends = [filters.SearchFilter, DjangoFilterBackend]
-    search_fields = ['content']
 
     # Admin can delete any message
     def perform_destroy(self, instance):
         instance.delete()
 
     # Admin can view reported messages
-    @action(detail=False, methods=['get'], url_path='reported')
+    @action(detail=False, methods=['get'], url_path='reported-messages')
     def reported_messages(self, request):
         reported_msgs = Message_Model.objects.filter(is_reported=True)
         serializer = self.get_serializer(reported_msgs, many=True)
